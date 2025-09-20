@@ -18,11 +18,11 @@ public class TaxCalculator {
             BigDecimal averagePrice = weightedAveragePrice(operations, 0, 0, null);
             if(operation.getOperation().equals("sell") && averagePrice.compareTo(operation.getUnitCost()) < 0) 
             {             
-              taxResults.add(new TaxResult(getTax(operation, averagePrice)));                    
+              taxResults.add(new TaxResult(getTax(operation, averagePrice).setScale(1, RoundingMode.HALF_UP)));                    
             }
             else
             {
-              taxResults.add(new TaxResult(BigDecimal.ZERO)); 
+              taxResults.add(new TaxResult(BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP))); 
             }
         }
         return taxResults;               
@@ -39,9 +39,7 @@ public class TaxCalculator {
                 if (currentWeightedAverage == null) {
                     currentWeightedAverage = BigDecimal.ZERO;
                 }
-                if (position >= operations.size()) {
-                    System.out.println("Média Ponderada Final: " + currentWeightedAverage);
-                    System.out.println("Quantidade Final: " + currentQuantity);
+                if (position >= operations.size()) {                  
                     return currentWeightedAverage;
                 }         
                     Operation operation = operations.get(position);

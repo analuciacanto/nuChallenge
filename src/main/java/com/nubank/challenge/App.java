@@ -37,6 +37,6 @@ public class App {
             System.out.println(jsonOutput);
         }
 
-        reader.close();
+        reader.close(); 
     }
 }
