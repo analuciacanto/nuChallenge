@@ -10,74 +10,78 @@ import com.nubank.challenge.model.TaxResult;
 
 public class TaxCalculator {
 
-    public List<TaxResult> calculateTax(List <Operation> operations) {
+    public List<TaxResult> calculateTax(List<Operation> operations) {
 
-        List <TaxResult> taxResults = new ArrayList<>();
+        BigDecimal accumulatedLoss = BigDecimal.ZERO; // Prejuízo acumulado
+        BigDecimal averagePrice = BigDecimal.ZERO;    // Média ponderada
+        int totalQuantity = 0;                        // Quantidade total de ações
+        List<TaxResult> taxResults = new ArrayList<>();
 
-        for(Operation operation : operations) {
-            BigDecimal averagePrice = weightedAveragePrice(operations, 0, 0, null);
-            if(operation.getOperation().equals("sell") && averagePrice.compareTo(operation.getUnitCost()) < 0) 
-            {             
-              taxResults.add(new TaxResult(getTax(operation, averagePrice).setScale(1, RoundingMode.HALF_UP)));                    
-            }
-            else
-            {
-              taxResults.add(new TaxResult(BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP))); 
+        for (Operation operation : operations) {
+
+            BigDecimal quantityBD = BigDecimal.valueOf(operation.getQuantity());
+            BigDecimal totalOperationValue = operation.getUnitCost().multiply(quantityBD);
+
+            if ("buy".equalsIgnoreCase(operation.getOperation())) {
+                // Atualiza média ponderada apenas nas compras
+                averagePrice = weightedAveragePriceForBuy(averagePrice, totalQuantity, operation.getUnitCost(), operation.getQuantity());
+                totalQuantity += operation.getQuantity();
+                taxResults.add(new TaxResult(BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)));
+
+            } else { // venda
+
+                BigDecimal unitProfit = operation.getUnitCost().subtract(averagePrice);
+                BigDecimal totalProfit = unitProfit.multiply(quantityBD);
+
+                if (totalOperationValue.compareTo(BigDecimal.valueOf(20000)) <= 0) {
+                    // Venda ≤ 20.000: acumula prejuízo se houver
+                    if (totalProfit.compareTo(BigDecimal.ZERO) < 0) {
+                        accumulatedLoss = accumulatedLoss.add(totalProfit.abs());
+                    }
+                    taxResults.add(new TaxResult(BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)));
+
+                } else {
+                    // Venda > 20.000: deduz prejuízo acumulado corretamente
+                    BigDecimal profitToTax = BigDecimal.ZERO;
+
+                    if (totalProfit.compareTo(BigDecimal.ZERO) <= 0) {
+                        // Lucro negativo: acumula prejuízo
+                        accumulatedLoss = accumulatedLoss.add(totalProfit.abs());
+                    } else {
+                        // Lucro positivo: deduz prejuízo acumulado
+                        if (accumulatedLoss.compareTo(totalProfit) >= 0) {
+                            accumulatedLoss = accumulatedLoss.subtract(totalProfit);
+                            profitToTax = BigDecimal.ZERO;
+                        } else {
+                            profitToTax = totalProfit.subtract(accumulatedLoss);
+                            accumulatedLoss = BigDecimal.ZERO;
+                        }
+                    }
+
+                    taxResults.add(new TaxResult(getTax(profitToTax, averagePrice).setScale(1, RoundingMode.HALF_UP)));
+                }
+
+                totalQuantity -= operation.getQuantity(); // atualiza saldo
             }
         }
-        return taxResults;               
+
+        return taxResults;
     }
 
     /**
-     nova-media-ponderada = ((quantidade-de-acoes-atual * media-ponderada-
-        atual) + (quantidade-de-acoes-compradas * valor-de-compra)) / (quantidade-de-acoes-atual + 
-                quantidade-de-acoes-compradas)
+     * Atualiza a média ponderada incremental para compras
+     * nova-media-ponderada = ((quantidade-atual * media-atual) + (quantidade-compra * valor-compra)) / (quantidade-atual + quantidade-compra)
      */
-    
-    private BigDecimal weightedAveragePrice(List<Operation> operations, int position, int currentQuantity, BigDecimal currentWeightedAverage){
-                
-                if (currentWeightedAverage == null) {
-                    currentWeightedAverage = BigDecimal.ZERO;
-                }
-                if (position >= operations.size()) {                  
-                    return currentWeightedAverage;
-                }         
-                    Operation operation = operations.get(position);
-                    position++;
-        
-                    if (operation.getOperation().equals("buy")) {
-
-                        currentWeightedAverage = currentWeightedAverage.multiply(new BigDecimal(currentQuantity))
-                        .add(operation.getUnitCost().multiply(new BigDecimal(operation.getQuantity())))
-                        .divide(new BigDecimal(currentQuantity + operation.getQuantity()), RoundingMode.HALF_UP);   
-                        currentQuantity += operation.getQuantity();
-                  
-                    }
-                    else if(operation.getOperation().equals("sell")) {
-                        currentQuantity -= operation.getQuantity();
-                    }
-                    return weightedAveragePrice(operations, position, currentQuantity, currentWeightedAverage);                     
-            }
-
-        
-    
-private BigDecimal getTax(Operation operation, BigDecimal averagePrice) {
-    /** O percentual de imposto pago é de 20% sobre o lucro obtido na operação. Ou seja, o imposto vai ser
-        pago quando há uma operação de venda cujo preço é superior ao preço médio ponderado de compra.
-    */
-
-    if (averagePrice == null) {
-        return BigDecimal.ZERO;
+    private BigDecimal weightedAveragePriceForBuy(BigDecimal currentAverage, int currentQuantity, BigDecimal buyPrice, int buyQuantity) {
+        if (currentQuantity + buyQuantity == 0) return BigDecimal.ZERO;
+        return currentAverage.multiply(BigDecimal.valueOf(currentQuantity))
+                .add(buyPrice.multiply(BigDecimal.valueOf(buyQuantity)))
+                .divide(BigDecimal.valueOf(currentQuantity + buyQuantity), 10, RoundingMode.HALF_UP);
     }
 
-    BigDecimal profit = operation.getUnitCost()
-                        .subtract(averagePrice)
-                        .multiply(new BigDecimal(operation.getQuantity()));
-
-    BigDecimal tax = profit.multiply(new BigDecimal("0.20"))
-                           .setScale(2, RoundingMode.HALF_UP);
-
-    return tax;
+    private BigDecimal getTax(BigDecimal profit, BigDecimal averagePrice) {
+        if (averagePrice == null || profit.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
+        return profit.multiply(new BigDecimal("0.20")).setScale(2, RoundingMode.HALF_UP);
     }
-
 }
+    
