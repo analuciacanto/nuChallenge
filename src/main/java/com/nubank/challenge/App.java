@@ -17,10 +17,8 @@ public class App {
         ObjectMapper mapper = new ObjectMapper();
 
         // Entrada: arquivo txt
-        BufferedReader reader = new BufferedReader(new FileReader("input.txt"));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 
-        // Saída: arquivo txt
-        BufferedWriter writer = new BufferedWriter(new FileWriter("saida.txt"));
 
         String line;
         while ((line = reader.readLine()) != null) {
@@ -35,14 +33,10 @@ public class App {
             // Converte a lista de TaxResult para JSON
             String jsonOutput = mapper.writeValueAsString(taxResults);
 
-            // Escreve no arquivo
-            writer.write(jsonOutput);
-            writer.write("\n"); // se quiser separar cada linha de simulação
+            // Escreve no stdout (uma linha por simulação)
+            System.out.println(jsonOutput);
         }
 
         reader.close();
-        writer.close();
-
-        System.out.println("Processamento finalizado! Verifique o arquivo saida.txt");
     }
 }
