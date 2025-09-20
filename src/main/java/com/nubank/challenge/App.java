@@ -6,8 +6,12 @@ import java.util.List;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nubank.challenge.model.Operation;
+import com.nubank.challenge.model.TaxResult;
+import com.nubank.challenge.service.TaxCalculator;
+
 
 public class App {
+
     public static void main(String[] args) throws Exception {
 
         ObjectMapper mapper = new ObjectMapper();
@@ -25,13 +29,15 @@ public class App {
 
             // Converte a linha JSON em lista de Operation
             List<Operation> operations = mapper.readValue(line, new TypeReference<List<Operation>>() {});
+            TaxCalculator calculator = new TaxCalculator();
+            List<TaxResult> taxResults = calculator.calculateTax(operations);
+            
+            // Converte a lista de TaxResult para JSON
+            String jsonOutput = mapper.writeValueAsString(taxResults);
 
-            // Escreve no arquivo de saída
-            writer.write("Nova simulação:\n");
-            for (Operation op : operations) {
-                writer.write(op.getOperation() + " - " + op.getUnitCost() + " - " + op.getQuantity() + "\n");
-            }
-            writer.write("-------------------\n");
+            // Escreve no arquivo
+            writer.write(jsonOutput);
+            writer.write("\n"); // se quiser separar cada linha de simulação
         }
 
         reader.close();

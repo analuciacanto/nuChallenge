@@ -6,6 +6,10 @@ public class TaxResult {
     
     private BigDecimal tax;
 
+     public TaxResult(BigDecimal tax) {
+        this.tax = tax;
+    }
+
     public BigDecimal getTax() {
         return tax;
     }
